@@ -140,6 +140,12 @@ let package = Package(
                 .enableExperimentalFeature("StrictConcurrency")
             ]
         ),
+        .executableTarget(
+            name: "MambaRun",
+            dependencies: [
+                .target(name: "MLXLLM")
+            ]
+        ),
     ]
 )
 
