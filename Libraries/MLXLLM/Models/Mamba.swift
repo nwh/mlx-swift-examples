@@ -5,7 +5,15 @@ import MLXLMCommon
 
 // port of https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/models/mamba.py
 
-// TODO support alternative JSON keys like d_model for hidden_size
+struct StringKey: CodingKey, ExpressibleByStringLiteral {
+    var intValue: Int? = nil
+    var stringValue: String
+    init?(intValue: Int) { return nil }
+    init?(stringValue: String) { self.stringValue = stringValue }
+    init(stringLiteral: StringLiteralType) {
+        self.stringValue = stringLiteral
+    }
+}
 
 public struct MambaConfiguration: Codable, Sendable {
     var modelType: String
@@ -18,12 +26,9 @@ public struct MambaConfiguration: Codable, Sendable {
     var useBias: Bool
     var useConvBias: Bool
     var timeStepRank: Int
-    private let _tieWordEmbeddings: Bool?
-    public var tieWordEmbeddings: Bool { _tieWordEmbeddings ?? true }
-    private var _useBcdtRms: Bool?
-    public var useBcdtRms: Bool { _useBcdtRms ?? false }
-    private let _mixerRmsEps: Float?
-    public var mixerRmsEps: Float { _mixerRmsEps ?? 1e-6 }
+    var tieWordEmbeddings: Bool
+    var useBcdtRms: Bool
+    var mixerRmsEps: Float
 
     enum CodingKeys: String, CodingKey {
         case modelType = "model_type"
@@ -36,44 +41,70 @@ public struct MambaConfiguration: Codable, Sendable {
         case useBias = "use_bias"
         case useConvBias = "use_conv_bias"
         case timeStepRank = "time_step_rank"
-        case _tieWordEmbeddings = "tie_word_embeddings"
-        case _useBcdtRms = "use_bcdt_rms"
-        case _mixerRmsEps = "mixer_rms_eps"
+        case tieWordEmbeddings = "tie_word_embeddings"
+        case useBcdtRms = "use_bcdt_rms"
+        case mixerRmsEps = "mixer_rms_eps"
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let fallback = try decoder.container(keyedBy: StringKey.self)
 
         modelType = try container.decode(String.self, forKey: .modelType)
         vocabSize = try container.decode(Int.self, forKey: .vocabSize)
-        hiddenSize = try container.decode(Int.self, forKey: .hiddenSize)
-        intermediateSize = try container.decode(Int.self, forKey: .intermediateSize)
-        stateSize = try container.decode(Int.self, forKey: .stateSize)
-        numHiddenLayers = try container.decode(Int.self, forKey: .numHiddenLayers)
-        convKernel = try container.decode(Int.self, forKey: .convKernel)
-        useBias = try container.decode(Bool.self, forKey: .useBias)
-        useConvBias = try container.decode(Bool.self, forKey: .useConvBias)
-        if let intValue = try? container.decode(Int.self, forKey: .timeStepRank) {
-            timeStepRank = intValue
-        } else if let stringValue = try? container.decode(String.self, forKey: .timeStepRank),
-            stringValue == "auto"
+        hiddenSize =
+            try container
+            .decodeIfPresent(Int.self, forKey: .hiddenSize)
+            ?? fallback
+            .decode(Int.self, forKey: "d_model")
+        intermediateSize =
+            try container
+            .decodeIfPresent(Int.self, forKey: .intermediateSize)
+            ?? fallback
+            .decode(Int.self, forKey: "d_inner")
+        stateSize =
+            try container
+            .decodeIfPresent(Int.self, forKey: .stateSize)
+            ?? fallback
+            .decode(Int.self, forKey: "d_state")
+        numHiddenLayers =
+            try container
+            .decodeIfPresent(Int.self, forKey: .numHiddenLayers)
+            ?? fallback
+            .decodeIfPresent(Int.self, forKey: "n_layer")
+            ?? fallback
+            .decode(Int.self, forKey: "n_layers")
+        convKernel =
+            try container
+            .decodeIfPresent(Int.self, forKey: .convKernel)
+            ?? fallback
+            .decode(Int.self, forKey: "d_conv")
+        useBias =
+            try container
+            .decodeIfPresent(Bool.self, forKey: .useBias)
+            ?? fallback
+            .decode(Bool.self, forKey: "bias")
+        useConvBias =
+            try container
+            .decodeIfPresent(Bool.self, forKey: .useConvBias)
+            ?? fallback
+            .decode(Bool.self, forKey: "conv_bias")
+
+        if let timeStepRankAuto = try? container.decode(String.self, forKey: .timeStepRank),
+            timeStepRankAuto == "auto"
         {
-            // timeStepRank = ceil(hiddenSize / 16)
             timeStepRank = (hiddenSize + 15) / 16
         } else {
-            throw DecodingError.typeMismatch(
-                String.self,
-                .init(
-                    codingPath: decoder.codingPath,
-                    debugDescription: #"time_step_rank is not an Int or "auto""#))
+            timeStepRank = try container.decode(Int.self, forKey: .timeStepRank)
         }
-        _tieWordEmbeddings =
-            try container
-            .decodeIfPresent(Bool.self, forKey: ._tieWordEmbeddings)
-        _useBcdtRms = try container.decodeIfPresent(Bool.self, forKey: ._useBcdtRms)
+
+        tieWordEmbeddings =
+            try container.decodeIfPresent(Bool.self, forKey: .tieWordEmbeddings) ?? true
+        useBcdtRms = try container.decodeIfPresent(Bool.self, forKey: .useBcdtRms) ?? false
+        mixerRmsEps = try container.decodeIfPresent(Float.self, forKey: .mixerRmsEps) ?? 1e-6
+
         if modelType == "falcon_mamba" {
-            _useBcdtRms = true
+            useBcdtRms = true
         }
-        _mixerRmsEps = try container.decodeIfPresent(Float.self, forKey: ._mixerRmsEps)
     }
 }
