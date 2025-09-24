@@ -6,6 +6,16 @@ import MLXFast
 import MLXLMCommon
 import MLXNN
 
+// TODO remove personal notes
+// https://swiftpackageindex.com/ml-explore/mlx-swift-examples/main/documentation/mlxlmcommon/porting
+// Properties that exist in weight files:
+//  - @ModuleInfo(key: "layer_name") var layerName: Module
+//  - @ParameterInfo var weights: MLXArray
+//  - @ParameterInfo(key: "big_array") var bigArray: MLXArray
+//
+// For computed arrays that don't exist in weight files:
+//  - private var _privateArray: MLXArray
+
 // port of https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/models/mamba.py
 
 struct StringKey: CodingKey, ExpressibleByStringLiteral {
@@ -129,9 +139,20 @@ private class MixerNorm: Module, UnaryLayer {
 private class MambaBlock: Module {
 
     let args: MambaConfiguration
+
+    // TODO mixerNorm should not be exposed as a module, it is internal
+    // I think we could also model this as a closure
     @ModuleInfo(key: "mixer_norm") var mixerNorm: MixerNorm?
+
     @ModuleInfo(key: "in_proj") var inProj: Linear
     @ModuleInfo(key: "conv1d") var conv1d: Conv1d
+    @ModuleInfo(key: "x_proj") var xProj: Linear
+    @ModuleInfo(key: "dt_proj") var dtProj: Linear
+
+    @ParameterInfo(key: "A_log") var aLog: MLXArray
+    @ParameterInfo(key: "D") var d: MLXArray
+
+    @ModuleInfo(key: "out_proj") var outProj: Linear
 
     public init(_ args: MambaConfiguration) {
         self.args = args
