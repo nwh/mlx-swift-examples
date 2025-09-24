@@ -17,7 +17,7 @@ open class ProcessorTypeRegistry: @unchecked Sendable {
     }
 
     // Note: using NSLock as we have very small (just dictionary get/set)
-    // critical sections and expect no contention.  this allows the methods
+    // critical sections and expect no contention. this allows the methods
     // to remain synchronous.
     private let lock = NSLock()
 
@@ -26,10 +26,11 @@ open class ProcessorTypeRegistry: @unchecked Sendable {
     /// Add a new model to the type registry.
     public func registerProcessorType(
         _ type: String,
-        creator: @Sendable @escaping (
-            URL,
-            any Tokenizer
-        ) throws -> any UserInputProcessor
+        creator:
+            @Sendable @escaping (
+                URL,
+                any Tokenizer
+            ) throws -> any UserInputProcessor
     ) {
         lock.withLock {
             creators[type] = creator

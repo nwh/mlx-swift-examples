@@ -2,7 +2,6 @@
 
 import Foundation
 import MLX
-import MLXRandom
 import Tokenizers
 
 /// A `LogitSampler` is responsible for sampling `logits` produced by
@@ -60,6 +59,19 @@ public struct GenerateParameters: Sendable {
     /// Maximum tokens to generate
     public var maxTokens: Int?
 
+    /// Maximum size of the key-value cache. Old entries (except the first 4 tokens) will be overwritten.
+    /// When set, uses ``RotatingKVCache`` instead of ``KVCacheSimple``
+    public var maxKVSize: Int?
+
+    /// Number of bits to use for KV cache quantization. nil implies no cache quantization.
+    public var kvBits: Int?
+
+    /// Group size for KV cache quantization (default: 64)
+    public var kvGroupSize: Int = 64
+
+    /// Step to begin using a quantized KV cache when kvBits is non-nil (default: 0)
+    public var quantizedKVStart: Int = 0
+
     /// sampling temperature
     public var temperature: Float = 0.6
 
@@ -74,10 +86,18 @@ public struct GenerateParameters: Sendable {
 
     public init(
         maxTokens: Int? = nil,
+        maxKVSize: Int? = nil,
+        kvBits: Int? = nil,
+        kvGroupSize: Int = 64,
+        quantizedKVStart: Int = 0,
         temperature: Float = 0.6, topP: Float = 1.0, repetitionPenalty: Float? = nil,
         repetitionContextSize: Int = 20
     ) {
         self.maxTokens = maxTokens
+        self.maxKVSize = maxKVSize
+        self.kvBits = kvBits
+        self.kvGroupSize = kvGroupSize
+        self.quantizedKVStart = quantizedKVStart
         self.temperature = temperature
         self.topP = topP
         self.repetitionPenalty = repetitionPenalty
@@ -106,7 +126,9 @@ public struct GenerateParameters: Sendable {
 
 /// Sampler that uses `argMax` (most likely) to sample the logits.
 public struct ArgMaxSampler: LogitSampler {
-    public func sample(logits: MLX.MLXArray) -> MLX.MLXArray {
+    public init() {}
+
+    public func sample(logits: MLXArray) -> MLXArray {
         argMax(logits, axis: -1)
     }
 }
@@ -115,15 +137,21 @@ public struct ArgMaxSampler: LogitSampler {
 public struct TopPSampler: LogitSampler {
     let temp: MLXArray
     let topP: MLXArray
+    let randomState: MLXRandom.RandomState
 
     public init(temperature: Float, topP: Float) {
         self.temp = MLXArray(temperature)
         self.topP = MLXArray(topP)
+        self.randomState = MLXRandom.RandomState()
     }
 
-    private let compiledTopPSampling: (MLXArray, MLXArray, MLXArray) -> MLXArray = {
-        compile(inputs: [MLXRandom.globalState], outputs: [MLXRandom.globalState]) {
-            logits, topP, temp in
+    public func sample(logits: MLXArray) -> MLXArray {
+        var logits = logits
+        if logits.dtype == .bfloat16 {
+            logits = logits.asType(.float32)
+        }
+
+        return withRandomState(randomState) {
             let probs = softmax(logits / temp, axis: -1)
             let sortedIndices = argSort(probs, axis: -1)
 
@@ -138,34 +166,23 @@ public struct TopPSampler: LogitSampler {
             let sortedToken = categorical(log(topProbs))
             return sortedIndices.squeezed(axis: 0)[sortedToken]
         }
-    }()
-
-    public func sample(logits: MLXArray) -> MLXArray {
-        var logits = logits
-        if logits.dtype == .bfloat16 {
-            logits = logits.asType(.float32)
-        }
-
-        return compiledTopPSampling(logits, topP, temp)
     }
 }
 
 /// Processor that uses `temperature` to sample the logits
 public struct CategoricalSampler: LogitSampler {
     let temp: MLXArray
+    let randomState: MLXRandom.RandomState
 
     public init(temperature: Float) {
         self.temp = MLXArray(temperature)
+        self.randomState = MLXRandom.RandomState()
     }
 
-    private let compiledCategorical: (MLXArray, MLXArray) -> MLXArray = {
-        compile(inputs: [MLXRandom.globalState], outputs: [MLXRandom.globalState]) { logits, temp in
+    public func sample(logits: MLXArray) -> MLXArray {
+        return withRandomState(randomState) {
             categorical(logits * (1 / temp))
         }
-    }()
-
-    public func sample(logits: MLXArray) -> MLXArray {
-        compiledCategorical(logits, temp)
     }
 }
 
@@ -258,7 +275,12 @@ public struct TokenIterator: Sequence, IteratorProtocol {
     var tokenCount = 0
     let maxTokens: Int?
 
-    /// Initialize a `TokenIterator` with the given tokens.  Note: this has been
+    // Cache quantization parameters
+    let kvBits: Int?
+    let kvGroupSize: Int
+    let quantizedKVStart: Int
+
+    /// Initialize a `TokenIterator` with the given tokens. Note: this has been
     /// replaced with ``init(input:model:cache:parameters:)``.
     ///
     /// - Parameters:
@@ -278,6 +300,10 @@ public struct TokenIterator: Sequence, IteratorProtocol {
         self.processor = parameters.processor()
         self.sampler = parameters.sampler()
         self.maxTokens = parameters.maxTokens
+
+        self.kvBits = parameters.kvBits
+        self.kvGroupSize = parameters.kvGroupSize
+        self.quantizedKVStart = parameters.quantizedKVStart
 
         try prepare(input: .init(text: y), windowSize: parameters.prefillStepSize)
     }
@@ -306,6 +332,10 @@ public struct TokenIterator: Sequence, IteratorProtocol {
         self.sampler = parameters.sampler()
         self.maxTokens = parameters.maxTokens
 
+        self.kvBits = parameters.kvBits
+        self.kvGroupSize = parameters.kvGroupSize
+        self.quantizedKVStart = parameters.quantizedKVStart
+
         try prepare(input: input, windowSize: parameters.prefillStepSize)
     }
 
@@ -331,6 +361,11 @@ public struct TokenIterator: Sequence, IteratorProtocol {
         self.processor = processor
         self.sampler = sampler
         self.maxTokens = maxTokens
+
+        // No cache quantization for this direct initialization
+        self.kvBits = nil
+        self.kvGroupSize = 64
+        self.quantizedKVStart = 0
 
         try prepare(input: input, windowSize: prefillStepSize)
     }
@@ -373,6 +408,14 @@ public struct TokenIterator: Sequence, IteratorProtocol {
         let result = model(
             previous[text: .newAxis], cache: cache.isEmpty ? nil : cache, state: state)
         self.state = result.state
+
+        // Apply dynamic cache quantization after each step
+        maybeQuantizeKVCache(
+            cache: &cache,
+            kvBits: kvBits,
+            kvGroupSize: kvGroupSize,
+            quantizedKVStart: quantizedKVStart
+        )
 
         return convertToToken(logits: result.logits)
     }
@@ -590,9 +633,9 @@ public func generate(
     let now = Date.timeIntervalSinceReferenceDate
     let generateTime = now - start
 
-    // TokenIterator uses `asyncEval()` to keep the pipeline full.  If the caller
+    // TokenIterator uses `asyncEval()` to keep the pipeline full. If the caller
     // exits the program right away, those tasks will still be executing and will
-    // hit assertions as the mlx scheduler is torn down.  Synchronize with the stream
+    // hit assertions as the mlx scheduler is torn down. Synchronize with the stream
     // to make sure it is complete.
     Stream().synchronize()
 
@@ -700,6 +743,7 @@ public func generate(
 ///
 /// - Parameters:
 ///   - input: The input for the language model.
+///   - cache: optional ``KVCache``
 ///   - parameters: The configuration options for token generation.
 ///   - context: The model context, including the model itself and associated tokenizer.
 /// - Returns: An `AsyncStream` that emits `Generation` values, including generated tokens (`.token`)
@@ -729,10 +773,10 @@ public func generate(
 /// }
 /// ```
 public func generate(
-    input: LMInput, parameters: GenerateParameters, context: ModelContext
+    input: LMInput, cache: [KVCache]? = nil, parameters: GenerateParameters, context: ModelContext
 ) throws -> AsyncStream<Generation> {
     let iterator = try TokenIterator(
-        input: input, model: context.model, parameters: parameters)
+        input: input, model: context.model, cache: cache, parameters: parameters)
     return generate(
         input: input, context: context, iterator: iterator)
 }
@@ -757,6 +801,7 @@ public func generate(
 
             var tokenCount = 0
             var detokenizer = NaiveStreamingDetokenizer(tokenizer: context.tokenizer)
+            let toolCallProcessor = ToolCallProcessor()
 
             for token in iterator {
 
@@ -779,7 +824,16 @@ public func generate(
                 detokenizer.append(token: token)
                 if let chunk = detokenizer.next() {
                     tokenCount += 1
-                    continuation.yield(.chunk(chunk))
+
+                    // Process chunk through the tool call processor
+                    if let textToYield = toolCallProcessor.processChunk(chunk) {
+                        continuation.yield(.chunk(textToYield))
+                    }
+
+                    // Check if we have a complete tool call
+                    if let toolCall = toolCallProcessor.toolCalls.popLast() {
+                        continuation.yield(.toolCall(toolCall))
+                    }
                 }
             }
 
@@ -862,14 +916,19 @@ public struct GenerateCompletionInfo: Sendable {
 public enum Generation: Sendable {
     /// A generated token represented as a String
     case chunk(String)
+
     /// Completion information summarizing token counts and performance metrics.
     case info(GenerateCompletionInfo)
+
+    /// A tool call from the language model.
+    case toolCall(ToolCall)
 
     /// Generated text or nil
     public var chunk: String? {
         switch self {
         case .chunk(let string): string
         case .info: nil
+        case .toolCall: nil
         }
     }
 
@@ -878,6 +937,16 @@ public enum Generation: Sendable {
         switch self {
         case .chunk: nil
         case .info(let info): info
+        case .toolCall: nil
+        }
+    }
+
+    /// Tool call or nil
+    public var toolCall: ToolCall? {
+        switch self {
+        case .chunk: nil
+        case .info: nil
+        case .toolCall(let toolCall): toolCall
         }
     }
 

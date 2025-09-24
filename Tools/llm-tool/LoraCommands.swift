@@ -8,7 +8,6 @@ import MLXLLM
 import MLXLMCommon
 import MLXNN
 import MLXOptimizers
-import MLXRandom
 import Tokenizers
 
 struct LoRACommand: AsyncParsableCommand {
@@ -283,6 +282,7 @@ struct LoRAEvalCommand: AsyncParsableCommand {
     @OptionGroup var args: LoRAModelArguments
     @OptionGroup var memory: MemoryArguments
     @OptionGroup var generate: GenerateArguments
+    @OptionGroup var prompt: PromptArguments
 
     @MainActor
     mutating func run() async throws {
@@ -297,7 +297,7 @@ struct LoRAEvalCommand: AsyncParsableCommand {
         memory.start()
 
         let defaultPrompt = await modelContainer.configuration.defaultPrompt
-        let prompt = generate.prompt ?? defaultPrompt
+        let prompt = prompt.prompt ?? defaultPrompt
 
         if !generate.quiet {
             print("Starting generation ...")
@@ -305,7 +305,7 @@ struct LoRAEvalCommand: AsyncParsableCommand {
         }
 
         // generate and print the result
-        let result = try await modelContainer.perform { [generate] context in
+        let (result, _) = try await modelContainer.perform { [generate] context in
             let input = try await context.processor.prepare(input: .init(prompt: prompt))
             return try await generate.generate(input: input, context: context)
         }

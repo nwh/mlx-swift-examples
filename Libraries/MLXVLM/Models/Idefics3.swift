@@ -9,7 +9,6 @@ import CoreImage
 import Foundation
 import Hub
 import MLX
-import MLXFast
 import MLXLMCommon
 import MLXNN
 import Tokenizers
@@ -220,8 +219,9 @@ private enum Language {
             )
         }
 
-        func callAsFunction(_ x: MLXArray, mask: MLXArray? = nil, cache: KVCache? = nil) -> MLXArray
-        {
+        func callAsFunction(
+            _ x: MLXArray, mask: MLXFast.ScaledDotProductAttentionMaskMode, cache: KVCache? = nil
+        ) -> MLXArray {
             let B = x.dim(0)
             let L = x.dim(1)
             var q = q_proj(x)
@@ -236,21 +236,17 @@ private enum Language {
             q = ropeEmbed(q, offset: offset)
             k = ropeEmbed(k, offset: offset)
 
-            if let cache {
-                let (nk, nv) = cache.update(keys: k, values: v)
-                k = nk
-                v = nv
-            }
-
-            let out = MLXFast.scaledDotProductAttention(
+            let output = attentionWithCacheUpdate(
                 queries: q,
                 keys: k,
                 values: v,
+                cache: cache,
                 scale: scale,
                 mask: mask
             )
-            .transposed(0, 2, 1, 3).reshaped(B, L, -1)
-            let final = o_proj(out)
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, L, -1)
+            let final = o_proj(output)
             return final
         }
     }
@@ -296,7 +292,9 @@ private enum Language {
             )
         }
 
-        func callAsFunction(_ x: MLXArray, mask: MLXArray?, cache: KVCache?) -> MLXArray {
+        func callAsFunction(
+            _ x: MLXArray, mask: MLXFast.ScaledDotProductAttentionMaskMode, cache: KVCache?
+        ) -> MLXArray {
             let a = selfAttn(inputLayerNorm(x), mask: mask, cache: cache)
             let h = x + a
             let m = mlp(postAttentionLayerNorm(h))
@@ -424,7 +422,9 @@ private enum Vision {
             )
         }
 
-        func callAsFunction(_ x: MLXArray, mask: MLXArray? = nil) -> MLXArray {
+        func callAsFunction(_ x: MLXArray, mask: MLXFast.ScaledDotProductAttentionMaskMode = .none)
+            -> MLXArray
+        {
             let (B, L, D) = (x.dim(0), x.dim(1), x.dim(2))
             let q = q_proj(x).reshaped(B, L, numHeads, D / numHeads).transposed(
                 0,
@@ -445,15 +445,16 @@ private enum Vision {
                 3
             )
 
-            let out = MLXFast.scaledDotProductAttention(
+            let output = MLXFast.scaledDotProductAttention(
                 queries: q,
                 keys: k,
                 values: v,
                 scale: scale,
                 mask: mask
             )
-            .transposed(0, 2, 1, 3).reshaped(B, L, D)
-            let final = o_proj(out)
+            .transposed(0, 2, 1, 3)
+            .reshaped(B, L, D)
+            let final = o_proj(output)
             return final
         }
     }
@@ -501,7 +502,9 @@ private enum Vision {
             )
         }
 
-        func callAsFunction(_ x: MLXArray, mask: MLXArray? = nil) -> MLXArray {
+        func callAsFunction(_ x: MLXArray, mask: MLXFast.ScaledDotProductAttentionMaskMode = .none)
+            -> MLXArray
+        {
             let h = x + self_attn(layerNorm1(x), mask: mask)
             let out = h + mlp(layerNorm2(h))
             return out
@@ -515,7 +518,10 @@ private enum Vision {
                 .map { _ in EncoderLayer(config) }
         }
 
-        func callAsFunction(_ x: MLXArray, outputHiddenStates: Bool = false, mask: MLXArray? = nil)
+        func callAsFunction(
+            _ x: MLXArray, outputHiddenStates: Bool = false,
+            mask: MLXFast.ScaledDotProductAttentionMaskMode = .none
+        )
             -> (
                 MLXArray,
                 [MLXArray]?
@@ -817,10 +823,19 @@ public class Idefics3Processor: UserInputProcessor {
         self.tokenizer = tokenizer
     }
 
+    private func prompt(from userInput: UserInput) -> String {
+        switch userInput.prompt {
+        case .text(let text):
+            text
+        case .messages(let messages):
+            messages.last?["content"] as? String ?? ""
+        case .chat(let messages):
+            messages.last?.content ?? ""
+        }
+    }
+
     public func prepare(input: UserInput) throws -> LMInput {
-
-        let prompt = input.prompt.asMessages().last?["content"] as? String ?? ""
-
+        let prompt = prompt(from: input)
         if input.images.isEmpty {
             // No image scenario
             let tokens = try tokenizer.encode(text: prompt)

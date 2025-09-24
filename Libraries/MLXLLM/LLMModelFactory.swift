@@ -35,20 +35,40 @@ public class LLMTypeRegistry: ModelTypeRegistry, @unchecked Sendable {
             "phimoe": create(PhiMoEConfiguration.self, PhiMoEModel.init),
             "gemma": create(GemmaConfiguration.self, GemmaModel.init),
             "gemma2": create(Gemma2Configuration.self, Gemma2Model.init),
+            "gemma3": create(Gemma3TextConfiguration.self, Gemma3TextModel.init),
+            "gemma3_text": create(Gemma3TextConfiguration.self, Gemma3TextModel.init),
+            "gemma3n": create(Gemma3nTextConfiguration.self, Gemma3nTextModel.init),
             "qwen2": create(Qwen2Configuration.self, Qwen2Model.init),
+            "qwen3": create(Qwen3Configuration.self, Qwen3Model.init),
+            "qwen3_moe": create(Qwen3MoEConfiguration.self, Qwen3MoEModel.init),
             "starcoder2": create(Starcoder2Configuration.self, Starcoder2Model.init),
             "cohere": create(CohereConfiguration.self, CohereModel.init),
             "openelm": create(OpenElmConfiguration.self, OpenELMModel.init),
             "internlm2": create(InternLM2Configuration.self, InternLM2Model.init),
+            "deepseek_v3": create(DeepseekV3Configuration.self, DeepseekV3Model.init),
+            "granite": create(GraniteConfiguration.self, GraniteModel.init),
+            "mimo": create(MiMoConfiguration.self, MiMoModel.init),
+            "glm4": create(GLM4Configuration.self, GLM4Model.init),
+            "acereason": create(Qwen2Configuration.self, Qwen2Model.init),
+            "bitnet": create(BitnetConfiguration.self, BitnetModel.init),
+            "smollm3": create(SmolLM3Configuration.self, SmolLM3Model.init),
+            "ernie4_5": create(Ernie45Configuration.self, Ernie45Model.init),
+            "lfm2": create(LFM2Configuration.self, LFM2Model.init),
+            "baichuan_m1": create(BaichuanM1Configuration.self, BaichuanM1Model.init),
+            "exaone4": create(Exaone4Configuration.self, Exaone4Model.init),
+            "gpt_oss": create(GPTOSSConfiguration.self, GPTOSSModel.init),
+            "lille-130m": create(Lille130mConfiguration.self, Lille130mModel.init),
+            "olmoe": create(OlmoEConfiguration.self, OlmoEModel.init),
+            "olmo2": create(Olmo2Configuration.self, Olmo2Model.init),
+            "bailing_moe": create(BailingMoeConfiguration.self, BailingMoeModel.init),
         ]
     }
-
 }
 
 /// Registry of models and any overrides that go with them, e.g. prompt augmentation.
 /// If asked for an unknown configuration this will use the model/tokenizer as-is.
 ///
-/// The python tokenizers have a very rich set of implementations and configuration.  The
+/// The Python tokenizers have a very rich set of implementations and configuration. The
 /// swift-tokenizers code handles a good chunk of that and this is a place to augment that
 /// implementation, if needed.
 public class LLMRegistry: AbstractModelRegistry, @unchecked Sendable {
@@ -124,6 +144,40 @@ public class LLMRegistry: AbstractModelRegistry, @unchecked Sendable {
         defaultPrompt: "What is the difference between lettuce and cabbage?"
     )
 
+    static public let gemma3_1B_qat_4bit = ModelConfiguration(
+        id: "mlx-community/gemma-3-1b-it-qat-4bit",
+        defaultPrompt: "What is the difference between a fruit and a vegetable?",
+        extraEOSTokens: ["<end_of_turn>"]
+    )
+
+    static public let gemma3n_E4B_it_lm_bf16 = ModelConfiguration(
+        id: "mlx-community/gemma-3n-E4B-it-lm-bf16",
+        defaultPrompt: "What is the difference between a fruit and a vegetable?",
+        // https://ai.google.dev/gemma/docs/core/prompt-structure
+        extraEOSTokens: ["<end_of_turn>"]
+    )
+
+    static public let gemma3n_E2B_it_lm_bf16 = ModelConfiguration(
+        id: "mlx-community/gemma-3n-E2B-it-lm-bf16",
+        defaultPrompt: "What is the difference between a fruit and a vegetable?",
+        // https://ai.google.dev/gemma/docs/core/prompt-structure
+        extraEOSTokens: ["<end_of_turn>"]
+    )
+
+    static public let gemma3n_E4B_it_lm_4bit = ModelConfiguration(
+        id: "mlx-community/gemma-3n-E4B-it-lm-4bit",
+        defaultPrompt: "What is the difference between a fruit and a vegetable?",
+        // https://ai.google.dev/gemma/docs/core/prompt-structure
+        extraEOSTokens: ["<end_of_turn>"]
+    )
+
+    static public let gemma3n_E2B_it_lm_4bit = ModelConfiguration(
+        id: "mlx-community/gemma-3n-E2B-it-lm-4bit",
+        defaultPrompt: "What is the difference between a fruit and a vegetable?",
+        // https://ai.google.dev/gemma/docs/core/prompt-structure
+        extraEOSTokens: ["<end_of_turn>"]
+    )
+
     static public let qwen205b4bit = ModelConfiguration(
         id: "mlx-community/Qwen1.5-0.5B-Chat-4bit",
         overrideTokenizer: "PreTrainedTokenizer",
@@ -137,6 +191,31 @@ public class LLMRegistry: AbstractModelRegistry, @unchecked Sendable {
 
     static public let qwen2_5_1_5b = ModelConfiguration(
         id: "mlx-community/Qwen2.5-1.5B-Instruct-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let qwen3_0_6b_4bit = ModelConfiguration(
+        id: "mlx-community/Qwen3-0.6B-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let qwen3_1_7b_4bit = ModelConfiguration(
+        id: "mlx-community/Qwen3-1.7B-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let qwen3_4b_4bit = ModelConfiguration(
+        id: "mlx-community/Qwen3-4B-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let qwen3_8b_4bit = ModelConfiguration(
+        id: "mlx-community/Qwen3-8B-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let qwen3MoE_30b_a3b_4bit = ModelConfiguration(
+        id: "mlx-community/Qwen3-30B-A3B-4bit",
         defaultPrompt: "Why is the sky blue?"
     )
 
@@ -166,6 +245,81 @@ public class LLMRegistry: AbstractModelRegistry, @unchecked Sendable {
         defaultPrompt: "What is the difference between a fruit and a vegetable?"
     )
 
+    static public let deepseek_r1_4bit = ModelConfiguration(
+        id: "mlx-community/DeepSeek-R1-4bit",
+        defaultPrompt: "Tell me about the history of Spain."
+    )
+
+    static public let granite3_3_2b_4bit = ModelConfiguration(
+        id: "mlx-community/granite-3.3-2b-instruct-4bit",
+        defaultPrompt: ""
+    )
+
+    static public let mimo_7b_sft_4bit = ModelConfiguration(
+        id: "mlx-community/MiMo-7B-SFT-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let glm4_9b_4bit = ModelConfiguration(
+        id: "mlx-community/GLM-4-9B-0414-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let acereason_7b_4bit = ModelConfiguration(
+        id: "mlx-community/AceReason-Nemotron-7B-4bit",
+        defaultPrompt: ""
+    )
+
+    static public let bitnet_b1_58_2b_4t_4bit = ModelConfiguration(
+        id: "mlx-community/bitnet-b1.58-2B-4T-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let baichuan_m1_14b_instruct_4bit = ModelConfiguration(
+        id: "mlx-community/Baichuan-M1-14B-Instruct-4bit-ft",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let smollm3_3b_4bit = ModelConfiguration(
+        id: "mlx-community/SmolLM3-3B-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let ernie_45_0_3BPT_bf16_ft = ModelConfiguration(
+        id: "mlx-community/ERNIE-4.5-0.3B-PT-bf16-ft",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let lfm2_1_2b_4bit = ModelConfiguration(
+        id: "mlx-community/LFM2-1.2B-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let exaone_4_0_1_2b_4bit = ModelConfiguration(
+        id: "mlx-community/exaone-4.0-1.2b-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let lille_130m_bf16 = ModelConfiguration(
+        id: "mlx-community/lille-130m-instruct-bf16",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let olmoe_1b_7b_0125_instruct_4bit = ModelConfiguration(
+        id: "mlx-community/OLMoE-1B-7B-0125-Instruct-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let olmo_2_1124_7B_Instruct_4bit = ModelConfiguration(
+        id: "mlx-community/OLMo-2-1124-7B-Instruct-4bit",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
+    static public let ling_mini_2_2bit = ModelConfiguration(
+        id: "mlx-community/Ling-mini-2.0-2bit-DWQ",
+        defaultPrompt: "Why is the sky blue?"
+    )
+
     private static func all() -> [ModelConfiguration] {
         [
             codeLlama13b4bit,
@@ -173,6 +327,12 @@ public class LLMRegistry: AbstractModelRegistry, @unchecked Sendable {
             gemma2bQuantized,
             gemma_2_2b_it_4bit,
             gemma_2_9b_it_4bit,
+            gemma3_1B_qat_4bit,
+            gemma3n_E4B_it_lm_bf16,
+            gemma3n_E2B_it_lm_bf16,
+            gemma3n_E4B_it_lm_4bit,
+            gemma3n_E2B_it_lm_4bit,
+            granite3_3_2b_4bit,
             llama3_1_8B_4bit,
             llama3_2_1B_4bit,
             llama3_2_3B_4bit,
@@ -186,7 +346,26 @@ public class LLMRegistry: AbstractModelRegistry, @unchecked Sendable {
             qwen205b4bit,
             qwen2_5_7b,
             qwen2_5_1_5b,
+            qwen3_0_6b_4bit,
+            qwen3_1_7b_4bit,
+            qwen3_4b_4bit,
+            qwen3_8b_4bit,
+            qwen3MoE_30b_a3b_4bit,
             smolLM_135M_4bit,
+            deepseek_r1_4bit,
+            mimo_7b_sft_4bit,
+            glm4_9b_4bit,
+            acereason_7b_4bit,
+            bitnet_b1_58_2b_4t_4bit,
+            smollm3_3b_4bit,
+            ernie_45_0_3BPT_bf16_ft,
+            lfm2_1_2b_4bit,
+            baichuan_m1_14b_instruct_4bit,
+            exaone_4_0_1_2b_4bit,
+            lille_130m_bf16,
+            olmoe_1b_7b_0125_instruct_4bit,
+            olmo_2_1124_7B_Instruct_4bit,
+            ling_mini_2_2bit,
         ]
     }
 
@@ -199,25 +378,32 @@ private struct LLMUserInputProcessor: UserInputProcessor {
 
     let tokenizer: Tokenizer
     let configuration: ModelConfiguration
+    let messageGenerator: MessageGenerator
 
-    internal init(tokenizer: any Tokenizer, configuration: ModelConfiguration) {
+    internal init(
+        tokenizer: any Tokenizer, configuration: ModelConfiguration,
+        messageGenerator: MessageGenerator
+    ) {
         self.tokenizer = tokenizer
         self.configuration = configuration
+        self.messageGenerator = messageGenerator
     }
 
     func prepare(input: UserInput) throws -> LMInput {
+        let messages = messageGenerator.generate(from: input)
         do {
-            let messages = input.prompt.asMessages()
             let promptTokens = try tokenizer.applyChatTemplate(
                 messages: messages, tools: input.tools, additionalContext: input.additionalContext)
+
             return LMInput(tokens: MLXArray(promptTokens))
-        } catch {
-            // #150 -- it might be a TokenizerError.chatTemplate("No chat template was specified")
-            // but that is not public so just fall back to text
-            let prompt = input.prompt
-                .asMessages()
+        } catch TokenizerError.missingChatTemplate {
+            print(
+                "No chat template was included or provided, so converting messages to simple text format. This is not optimal for model performance, so applications should provide a chat template if none is included with the model."
+            )
+            let prompt =
+                messages
                 .compactMap { $0["content"] as? String }
-                .joined(separator: ". ")
+                .joined(separator: "\n\n")
             let promptTokens = tokenizer.encode(text: prompt)
             return LMInput(tokens: MLXArray(promptTokens))
         }
@@ -253,28 +439,58 @@ public class LLMModelFactory: ModelFactory {
     public func _load(
         hub: HubApi, configuration: ModelConfiguration,
         progressHandler: @Sendable @escaping (Progress) -> Void
-    ) async throws -> ModelContext {
+    ) async throws -> sending ModelContext {
         // download weights and config
         let modelDirectory = try await downloadModel(
             hub: hub, configuration: configuration, progressHandler: progressHandler)
 
-        // load the generic config to unerstand which model and how to load the weights
+        // Load the generic config to understand which model and how to load the weights
         let configurationURL = modelDirectory.appending(component: "config.json")
-        let baseConfig = try JSONDecoder().decode(
-            BaseConfiguration.self, from: Data(contentsOf: configurationURL))
-        let model = try typeRegistry.createModel(
-            configuration: configurationURL, modelType: baseConfig.modelType)
+
+        let baseConfig: BaseConfiguration
+        do {
+            baseConfig = try JSONDecoder().decode(
+                BaseConfiguration.self, from: Data(contentsOf: configurationURL))
+        } catch let error as DecodingError {
+            throw ModelFactoryError.configurationDecodingError(
+                configurationURL.lastPathComponent, configuration.name, error)
+        }
+
+        let model: LanguageModel
+        do {
+            model = try typeRegistry.createModel(
+                configuration: configurationURL, modelType: baseConfig.modelType)
+        } catch let error as DecodingError {
+            throw ModelFactoryError.configurationDecodingError(
+                configurationURL.lastPathComponent, configuration.name, error)
+        }
 
         // apply the weights to the bare model
         try loadWeights(
-            modelDirectory: modelDirectory, model: model, quantization: baseConfig.quantization)
+            modelDirectory: modelDirectory, model: model,
+            perLayerQuantization: baseConfig.perLayerQuantization)
 
         let tokenizer = try await loadTokenizer(configuration: configuration, hub: hub)
 
+        let messageGenerator =
+            if let model = model as? LLMModel {
+                model.messageGenerator(tokenizer: tokenizer)
+            } else {
+                DefaultMessageGenerator()
+            }
+
+        let processor = LLMUserInputProcessor(
+            tokenizer: tokenizer, configuration: configuration,
+            messageGenerator: messageGenerator)
+
         return .init(
-            configuration: configuration, model: model,
-            processor: LLMUserInputProcessor(tokenizer: tokenizer, configuration: configuration),
-            tokenizer: tokenizer)
+            configuration: configuration, model: model, processor: processor, tokenizer: tokenizer)
     }
 
+}
+
+public class TrampolineModelFactory: NSObject, ModelFactoryTrampoline {
+    public static func modelFactory() -> (any MLXLMCommon.ModelFactory)? {
+        LLMModelFactory.shared
+    }
 }
