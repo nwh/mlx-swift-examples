@@ -129,12 +129,26 @@ private class MambaBlock: Module {
 
     let args: MambaConfiguration
     @ModuleInfo(key: "mixer_norm") var mixerNorm: MixerNorm?
+    @ModuleInfo(key: "in_proj") var inProj: Linear
+    @ModuleInfo(key: "conv1d") var conv1d: Conv1d
 
     public init(_ args: MambaConfiguration) {
         self.args = args
         if args.useBcdtRms {
             self._mixerNorm.wrappedValue = MixerNorm(eps: args.mixerRmsEps)
         }
+        self._inProj.wrappedValue = Linear(
+          args.hiddenSize, args.intermediateSize * 2, bias: args.useBias)
+        self._conv1d.wrappedValue = Conv1d(
+            inputChannels: args.intermediateSize,
+            outputChannels: args.intermediateSize,
+            kernelSize: args.convKernel,
+            stride: 1, //? TODO
+            padding: 0,
+            dilation: 0, //? TODO
+            groups: args.intermediateSize,
+            bias: args.useConvBias
+        )
 
     }
 
