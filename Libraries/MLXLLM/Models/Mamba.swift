@@ -2,9 +2,9 @@
 
 import Foundation
 import MLX
+import MLXFast
 import MLXLMCommon
 import MLXNN
-import MLXFast
 
 // port of https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/models/mamba.py
 
@@ -120,7 +120,8 @@ private class MixerNorm: Module, UnaryLayer {
     }
 
     public func callAsFunction(_ x: MLXArray) -> MLXArray {
-        return MLXFast
+        return
+            MLXFast
             .rmsNorm(x, weight: MLX.ones([x.dim(-1)], dtype: x.dtype), eps: self.eps)
     }
 }
@@ -138,18 +139,16 @@ private class MambaBlock: Module {
             self._mixerNorm.wrappedValue = MixerNorm(eps: args.mixerRmsEps)
         }
         self._inProj.wrappedValue = Linear(
-          args.hiddenSize, args.intermediateSize * 2, bias: args.useBias)
+            args.hiddenSize, args.intermediateSize * 2, bias: args.useBias)
         self._conv1d.wrappedValue = Conv1d(
             inputChannels: args.intermediateSize,
             outputChannels: args.intermediateSize,
             kernelSize: args.convKernel,
-            stride: 1, //? TODO
+            stride: 1,  //? TODO
             padding: 0,
-            dilation: 0, //? TODO
+            dilation: 0,  //? TODO
             groups: args.intermediateSize,
             bias: args.useConvBias
         )
-
     }
-
 }
