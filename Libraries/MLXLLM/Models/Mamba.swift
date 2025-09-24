@@ -1,7 +1,10 @@
 // Copyright © 2025 Apple Inc.
 
 import Foundation
+import MLX
 import MLXLMCommon
+import MLXNN
+import MLXFast
 
 // port of https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/models/mamba.py
 
@@ -107,4 +110,32 @@ public struct MambaConfiguration: Codable, Sendable {
             useBcdtRms = true
         }
     }
+}
+
+private class MixerNorm: Module, UnaryLayer {
+    let eps: Float
+
+    public init(eps: Float = 1e-5) {
+        self.eps = eps
+    }
+
+    public func callAsFunction(_ x: MLXArray) -> MLXArray {
+        return MLXFast
+            .rmsNorm(x, weight: MLX.ones([x.dim(-1)], dtype: x.dtype), eps: self.eps)
+    }
+}
+
+private class MambaBlock: Module {
+
+    let args: MambaConfiguration
+    @ModuleInfo(key: "mixer_norm") var mixerNorm: MixerNorm?
+
+    public init(_ args: MambaConfiguration) {
+        self.args = args
+        if args.useBcdtRms {
+            self._mixerNorm.wrappedValue = MixerNorm(eps: args.mixerRmsEps)
+        }
+
+    }
+
 }
