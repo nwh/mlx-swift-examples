@@ -166,5 +166,13 @@ private class MambaBlock: Module {
             args.timeStepRank + 2 * args.stateSize,
             bias: false
         )
+
+        self._dtProj.wrappedValue = Linear(
+            args.timeStepRank, args.intermediateSize, bias: true)
+
+        // TODO A_log and D
+
+        self._outProj = Linear(
+            args.intermediateSize, args.hiddenSize, bias: args.useBias)
     }
 }
