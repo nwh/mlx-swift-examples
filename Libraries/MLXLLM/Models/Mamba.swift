@@ -170,9 +170,16 @@ private class MambaBlock: Module {
         self._dtProj.wrappedValue = Linear(
             args.timeStepRank, args.intermediateSize, bias: true)
 
-        // TODO A_log and D
+        let A = repeated(
+            MLXArray(1 ..< args.stateSize + 1, [1, args.stateSize]),
+            count: args.intermediateSize,
+            axis: 0
+        )
 
-        self._outProj = Linear(
+        self._aLog.wrappedValue = log(A)
+        self._d.wrappedValue = ones([args.intermediateSize])
+
+        self._outProj.wrappedValue = Linear(
             args.intermediateSize, args.hiddenSize, bias: args.useBias)
     }
 }
