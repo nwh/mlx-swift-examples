@@ -154,9 +154,9 @@ private class MambaBlock: Module {
             inputChannels: args.intermediateSize,
             outputChannels: args.intermediateSize,
             kernelSize: args.convKernel,
-            stride: 1,  //? TODO
+            stride: 1,
             padding: 0,
-            dilation: 0,  //? TODO
+            dilation: 1,
             groups: args.intermediateSize,
             bias: args.useConvBias
         )
