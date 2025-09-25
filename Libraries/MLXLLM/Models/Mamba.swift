@@ -212,4 +212,38 @@ private class MambaBlock: Module {
         y = y + self._d.wrappedValue * x
         return (y, newState)
     }
+
+    func processSequence(_ x: MLXArray, convCache: MLXArray?, stateCache: MLXArray?)
+        -> (MLXArray, (MLXArray, MLXArray?))
+    {
+        let T = x.dim(1)
+        let xz = self.inProj(x)
+        var (x, z) = xz.split(axis: -1)
+        let K = self.args.convKernel
+        var xFull: MLXArray
+        if let convCache {
+            xFull = concatenated([convCache, x], axis: -1)
+        } else {
+            xFull = padded(
+                x,
+                widths: [
+                    .init((0, 0)),
+                    .init((K - 1, 0)),
+                    .init((0, 0)),
+                ])
+        }
+        let convOut = conv1d(xFull)
+        let newConvCache = xFull[0..., -(K - 1), 0..., 0...]
+        x = silu(convOut)
+        let A = -exp(self.aLog)
+        var currentState = stateCache
+        var y: [MLXArray] = []
+        var yT: MLXArray
+        for t in 0 ..< T {
+            (yT, currentState) = self.ssmStep(x[0..., t], A, state: currentState)
+            y.append(yT)
+        }
+        z = self.outProj(silu(z) * stacked(y, axis: 1))
+        return (z, (newConvCache, currentState))
+    }
 }
