@@ -182,4 +182,34 @@ private class MambaBlock: Module {
         self._outProj.wrappedValue = Linear(
             args.intermediateSize, args.hiddenSize, bias: args.useBias)
     }
+
+    func ssmStep(_ x: MLXArray, _ A: MLXArray, state: MLXArray?) -> (MLXArray, MLXArray) {
+        let deltaBC = self.xProj(x)
+        var deltaBCParts = split(
+            deltaBC,
+            indices: [self.args.timeStepRank, self.args.timeStepRank + self.args.stateSize],
+            axis: -1
+        ).map {
+            if self.args.useBcdtRms, let mixerNorm = self._mixerNorm {
+                return mixerNorm($0)
+            } else {
+                return $0
+            }
+        }
+        if self.args.useBcdtRms, let mixerNorm = self._mixerNorm {
+            deltaBCParts = deltaBCParts.map { mixerNorm($0) }
+        }
+        var delta = deltaBCParts[0]
+        let B = deltaBCParts[1]
+        let C = deltaBCParts[2]
+
+        delta = softplus(self.dtProj(delta))
+        var newState = expandedDimensions(delta * x, axis: -1) * expandedDimensions(B, axis: 1)
+        if let state {
+            newState += state * exp(expandedDimensions(delta, axis: -1) * A)
+        }
+        var y = newState.matmul(expandedDimensions(C, axis: -1)).squeezed(axis: 2)
+        y = y + self._d.wrappedValue * x
+        return (y, newState)
+    }
 }
