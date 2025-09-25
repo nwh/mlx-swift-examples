@@ -122,27 +122,11 @@ public struct MambaConfiguration: Codable, Sendable {
     }
 }
 
-private class MixerNorm: Module, UnaryLayer {
-    let eps: Float
-
-    public init(eps: Float = 1e-5) {
-        self.eps = eps
-    }
-
-    public func callAsFunction(_ x: MLXArray) -> MLXArray {
-        return
-            MLXFast
-            .rmsNorm(x, weight: MLX.ones([x.dim(-1)], dtype: x.dtype), eps: self.eps)
-    }
-}
-
 private class MambaBlock: Module {
 
     let args: MambaConfiguration
 
-    // TODO mixerNorm should not be exposed as a module, it is internal
-    // I think we could also model this as a closure
-    @ModuleInfo(key: "mixer_norm") var mixerNorm: MixerNorm?
+    var _mixerNorm: ((MLXArray) -> MLXArray)? = nil
 
     @ModuleInfo(key: "in_proj") var inProj: Linear
     @ModuleInfo(key: "conv1d") var conv1d: Conv1d
@@ -157,7 +141,12 @@ private class MambaBlock: Module {
     public init(_ args: MambaConfiguration) {
         self.args = args
         if args.useBcdtRms {
-            self._mixerNorm.wrappedValue = MixerNorm(eps: args.mixerRmsEps)
+            self._mixerNorm = {
+                MLXFast.rmsNorm(
+                    $0,
+                    weight: MLX.ones([$0.dim(-1)], dtype: $0.dtype),
+                    eps: args.mixerRmsEps)
+            }
         }
         self._inProj.wrappedValue = Linear(
             args.hiddenSize, args.intermediateSize * 2, bias: args.useBias)
