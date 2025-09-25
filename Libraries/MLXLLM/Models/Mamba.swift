@@ -148,8 +148,10 @@ private class MambaBlock: Module {
                     eps: args.mixerRmsEps)
             }
         }
+
         self._inProj.wrappedValue = Linear(
             args.hiddenSize, args.intermediateSize * 2, bias: args.useBias)
+
         self._conv1d.wrappedValue = Conv1d(
             inputChannels: args.intermediateSize,
             outputChannels: args.intermediateSize,
@@ -157,6 +159,12 @@ private class MambaBlock: Module {
             padding: 0,
             groups: args.intermediateSize,
             bias: args.useConvBias
+        )
+
+        self._xProj.wrappedValue = Linear(
+            args.intermediateSize,
+            args.timeStepRank + 2 * args.stateSize,
+            bias: false
         )
     }
 }
