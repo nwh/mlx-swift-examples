@@ -223,6 +223,7 @@ private class MambaBlock: Module {
                 ])
         }
         let convOut = conv1d(xFull)
+        // TODO there is a failure in the next line, maybe need .newAxis or something
         let newConvCache = xFull[0..., -(K - 1), 0..., 0...]
         x = silu(convOut)
         let A = -exp(self.aLog)
