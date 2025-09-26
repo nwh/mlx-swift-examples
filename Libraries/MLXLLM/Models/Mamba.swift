@@ -6,16 +6,6 @@ import MLXFast
 import MLXLMCommon
 import MLXNN
 
-// TODO remove personal notes
-// https://swiftpackageindex.com/ml-explore/mlx-swift-examples/main/documentation/mlxlmcommon/porting
-// Properties that exist in weight files:
-//  - @ModuleInfo(key: "layer_name") var layerName: Module
-//  - @ParameterInfo var weights: MLXArray
-//  - @ParameterInfo(key: "big_array") var bigArray: MLXArray
-//
-// For computed arrays that don't exist in weight files:
-//  - private var _privateArray: MLXArray
-
 // port of https://github.com/ml-explore/mlx-lm/blob/main/mlx_lm/models/mamba.py
 
 struct StringKey: CodingKey, ExpressibleByStringLiteral {
