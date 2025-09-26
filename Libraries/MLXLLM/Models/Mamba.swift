@@ -325,12 +325,11 @@ public class MambaModel: Module, LLMModel {
     public func newCache(parameters: MLXLMCommon.GenerateParameters?)
         -> [any MLXLMCommon.KVCache]
     {
-        // TODO python code is
-        // return [MambaCache() for _ in range(len(self.layers))]
-        return []
+        return (0 ..< args.numHiddenLayers).map { _ in MambaCache() }
     }
+
     public func loraLinearLayers() -> MLXLMCommon.LoRALinearLayers {
-        // not sure what to return here
+        // TODO ???
         return []
     }
 
