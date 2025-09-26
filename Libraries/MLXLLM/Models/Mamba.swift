@@ -318,6 +318,16 @@ public class MambaModel: Module, LLMModel {
         return (0 ..< args.numHiddenLayers).map { _ in MambaCache() }
     }
 
+    public func sanitize(weights: [String: MLXArray]) -> [String: MLXArray] {
+        var processedWeights = weights
+        for (key, value) in weights {
+            if key.contains("conv1d.weight") && value.dim(-1) != 1 {
+                processedWeights[key] = value.movedAxis(source: 2, destination: 1)
+            }
+        }
+        return processedWeights
+    }
+
     public func loraLinearLayers() -> MLXLMCommon.LoRALinearLayers {
         // TODO ???
         return []
