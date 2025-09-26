@@ -247,3 +247,36 @@ private class MambaBlock: Module {
         return (z, (newConvCache, currentState))
     }
 }
+
+private class MambaModelInner: Module {
+    let args: MambaConfiguration
+
+    public init(_ args: MambaConfiguration) {
+        self.args = args
+    }
+
+    public func callAsFunction(_ inputs: MLXArray, cache: [KVCache]? = nil) -> MLXArray {
+        return ones([10, 10])  // placeholder
+    }
+}
+
+public class MambaModel: Module, LLMModel {
+    private let model: MambaModelInner
+    public init(_ args: MambaConfiguration) {
+        self.model = MambaModelInner(args)
+    }
+    public func callAsFunction(_ inputs: MLXArray, cache: [KVCache]?) -> MLXArray {
+        // let out = model(inputs, cache: cache)
+        // return model.embedTokens.asLinear(out)
+        return ones([10, 10])  // placeholder
+    }
+
+    public func newCache(parameters: MLXLMCommon.GenerateParameters?) -> [any MLXLMCommon.KVCache] {
+        return []
+    }
+    public func loraLinearLayers() -> MLXLMCommon.LoRALinearLayers {
+        // not sure what to return here
+        return []
+    }
+
+}
