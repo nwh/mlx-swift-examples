@@ -265,7 +265,12 @@ private class MambaModelInner: Module {
     }
 
     public func callAsFunction(_ inputs: MLXArray, cache: [KVCache]? = nil) -> MLXArray {
-        return ones([10, 10])  // placeholder
+        var x = embeddings(inputs)
+        for (i, layer) in layers.enumerated() {
+            // x = layer(x, cache: cache?[i])
+            x = layer(x)  // TODO remove
+        }
+        return normF(x)
     }
 }
 
@@ -290,14 +295,14 @@ public class MambaModel: Module, LLMModel {
         if let lmHead {
             logits = lmHead(x)
         } else {
-            logits = ones([1])
-            // TODO use embeddings
-            //logits = self.backbone.embeddings.as_linear(x)
+            logits = self.backbone.embeddings.asLinear(x)
         }
         return logits
     }
 
-    public func newCache(parameters: MLXLMCommon.GenerateParameters?) -> [any MLXLMCommon.KVCache] {
+    public func newCache(parameters: MLXLMCommon.GenerateParameters?)
+        -> [any MLXLMCommon.KVCache]
+    {
         return []
     }
     public func loraLinearLayers() -> MLXLMCommon.LoRALinearLayers {
