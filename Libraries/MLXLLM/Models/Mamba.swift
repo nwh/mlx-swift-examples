@@ -248,11 +248,20 @@ private class MambaBlock: Module {
     }
 }
 
+// maps to mamba.Mamba
 private class MambaModelInner: Module {
-    let args: MambaConfiguration
+    @ModuleInfo var embeddings: Embedding
+    @ModuleInfo var layers: [Linear]  // TODO change to ResidualBlock
+    @ModuleInfo(key: "norm_f") var normF: RMSNorm
 
     public init(_ args: MambaConfiguration) {
-        self.args = args
+        self._embeddings.wrappedValue = Embedding(
+            embeddingCount: args.vocabSize, dimensions: args.hiddenSize)
+        self._layers.wrappedValue = (0 ..< args.numHiddenLayers).map { _ in
+            // TODO change to ResidualBlock
+            Linear(10, 10, bias: false)
+        }
+        self._normF.wrappedValue = RMSNorm(dimensions: args.hiddenSize)
     }
 
     public func callAsFunction(_ inputs: MLXArray, cache: [KVCache]? = nil) -> MLXArray {
@@ -260,6 +269,7 @@ private class MambaModelInner: Module {
     }
 }
 
+// maps to mamba.Model
 public class MambaModel: Module, LLMModel {
     let args: MambaConfiguration
     let modelType: String
@@ -281,6 +291,7 @@ public class MambaModel: Module, LLMModel {
             logits = lmHead(x)
         } else {
             logits = ones([1])
+            // TODO use embeddings
             //logits = self.backbone.embeddings.as_linear(x)
         }
         return logits
