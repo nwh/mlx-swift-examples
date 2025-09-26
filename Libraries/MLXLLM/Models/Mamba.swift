@@ -246,20 +246,43 @@ private class MambaBlock: Module {
         z = self.outProj(silu(z) * stacked(y, axis: 1))
         return (z, (newConvCache, currentState))
     }
+
+    public func callAsFunction(_ inputs: MLXArray, cache: MambaCache? = nil) -> MLXArray {
+        let (output, (newConvCache, newStateCache)) = self.processSequence(
+            inputs, convCache: cache?[0], stateCache: cache?[1]
+        )
+        if cache != nil {
+            cache![0] = newConvCache
+            cache![1] = newStateCache
+        }
+        return output
+    }
+
+}
+
+private class ResidualBlock: Module {
+    @ModuleInfo var mixer: MambaBlock
+    @ModuleInfo var norm: RMSNorm
+    public init(_ args: MambaConfiguration) {
+        self._mixer.wrappedValue = MambaBlock(args)
+        self._norm.wrappedValue = RMSNorm(dimensions: args.hiddenSize)
+    }
+    public func callAsFunction(_ inputs: MLXArray, cache: MambaCache? = nil) -> MLXArray {
+        return mixer(norm(inputs), cache: cache) + inputs
+    }
 }
 
 // maps to mamba.Mamba
 private class MambaModelInner: Module {
     @ModuleInfo var embeddings: Embedding
-    @ModuleInfo var layers: [Linear]  // TODO change to ResidualBlock
+    @ModuleInfo var layers: [ResidualBlock]
     @ModuleInfo(key: "norm_f") var normF: RMSNorm
 
     public init(_ args: MambaConfiguration) {
         self._embeddings.wrappedValue = Embedding(
             embeddingCount: args.vocabSize, dimensions: args.hiddenSize)
         self._layers.wrappedValue = (0 ..< args.numHiddenLayers).map { _ in
-            // TODO change to ResidualBlock
-            Linear(10, 10, bias: false)
+            ResidualBlock(args)
         }
         self._normF.wrappedValue = RMSNorm(dimensions: args.hiddenSize)
     }
@@ -267,8 +290,7 @@ private class MambaModelInner: Module {
     public func callAsFunction(_ inputs: MLXArray, cache: [KVCache]? = nil) -> MLXArray {
         var x = embeddings(inputs)
         for (i, layer) in layers.enumerated() {
-            // x = layer(x, cache: cache?[i])
-            x = layer(x)  // TODO remove
+            x = layer(x, cache: (cache?[i] as? MambaCache))
         }
         return normF(x)
     }
@@ -303,6 +325,8 @@ public class MambaModel: Module, LLMModel {
     public func newCache(parameters: MLXLMCommon.GenerateParameters?)
         -> [any MLXLMCommon.KVCache]
     {
+        // TODO python code is
+        // return [MambaCache() for _ in range(len(self.layers))]
         return []
     }
     public func loraLinearLayers() -> MLXLMCommon.LoRALinearLayers {
