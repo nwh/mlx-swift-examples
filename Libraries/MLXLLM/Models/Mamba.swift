@@ -261,14 +261,29 @@ private class MambaModelInner: Module {
 }
 
 public class MambaModel: Module, LLMModel {
-    private let model: MambaModelInner
+    let args: MambaConfiguration
+    let modelType: String
+    @ModuleInfo private var backbone: MambaModelInner
+    @ModuleInfo(key: "lm_head") var lmHead: Linear? = nil
+
     public init(_ args: MambaConfiguration) {
-        self.model = MambaModelInner(args)
+        self.args = args
+        self.modelType = args.modelType
+        self._backbone.wrappedValue = MambaModelInner(args)
+        if !args.tieWordEmbeddings {
+            self._lmHead.wrappedValue = Linear(args.hiddenSize, args.vocabSize, bias: false)
+        }
     }
     public func callAsFunction(_ inputs: MLXArray, cache: [KVCache]?) -> MLXArray {
-        // let out = model(inputs, cache: cache)
-        // return model.embedTokens.asLinear(out)
-        return ones([10, 10])  // placeholder
+        let x = self.backbone(inputs, cache: cache)
+        var logits: MLXArray
+        if let lmHead {
+            logits = lmHead(x)
+        } else {
+            logits = ones([1])
+            //logits = self.backbone.embeddings.as_linear(x)
+        }
+        return logits
     }
 
     public func newCache(parameters: MLXLMCommon.GenerateParameters?) -> [any MLXLMCommon.KVCache] {
