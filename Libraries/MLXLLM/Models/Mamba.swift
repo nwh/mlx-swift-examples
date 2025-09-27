@@ -224,7 +224,10 @@ private class MambaBlock: Module {
         }
         let convOut = conv1d(xFull)
         // TODO there is a failure in the next line, maybe need .newAxis or something
-        let newConvCache = xFull[0..., -(K - 1), 0..., 0...]
+        // there are only 3 slices in the python code, not 4
+        // I need to figure out how to transalte -(K-1)... to swift
+        // the following compiles, but not sure if it is correct
+        let newConvCache = xFull[0..., (1 - K)..., 0...]
         x = silu(convOut)
         let A = -exp(self.aLog)
         var currentState = stateCache
