@@ -212,7 +212,7 @@ private class MambaBlock: Module {
         let K = self.args.convKernel
         var xFull: MLXArray
         if let convCache {
-            xFull = concatenated([convCache, x], axis: -1)
+            xFull = concatenated([convCache, x], axis: 1)
         } else {
             xFull = padded(
                 x,
